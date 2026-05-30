@@ -161,6 +161,10 @@ def build_weather_record(weather_dict, target_date, city):
         "min_temp": daily_data.get("temperature_2m_min", [None])[0],
         "precip": daily_data.get("precipitation_sum", [None])[0],
         "max_wind": daily_data.get("windspeed_10m_max", [None])[0],
+        "sunrise": daily_data.get("sunrise", [None])[0],
+        "sunset": daily_data.get("sunset", [None])[0],
+        "sunrise": daily_data.get("sunrise", [None])[0],
+        "uv_index_max": daily_data.get("uv_index_max", [None])[0],
     }
 
 # ---------------------------------------------------------
