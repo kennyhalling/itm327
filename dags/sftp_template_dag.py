@@ -34,8 +34,8 @@ log = logging.getLogger(__name__)
 # IMPORTANT: This path is relative to the Airflow project root.
 STAGING_AREA = Path("staging/sftp")
 PROCESSED_LOG_FILE = STAGING_AREA / "processed_dates.txt"
-SNOWFLAKE_TABLE = "YOUR_TABLE_NAME_HERE"  # TODO: Replace with your target table name
-
+SNOWFLAKE_TABLE = "NEWS_DAG_HALLING_K"  # TODO: Replace with your target table name
+SFTP_DIR = os.getenv("SFTP_DIR")
 
 
 @dag(
@@ -81,7 +81,7 @@ def sftp_template_pipeline():
         # --- Proceed with Extraction ---
         local_dir.mkdir(exist_ok=True)
         #SFTP_DIR has the path of the SFTP directory stored and airflow will automatically load all .env variables 
-        remote_path = f"{SFTP_DIR}{date_str}"
+        remote_path = f"{SFTP_DIR.rstrip('/')}/{date_str}"
         downloaded_files = []
 
         log.info(f"Connecting to SFTP to download files from: {remote_path}")
@@ -98,7 +98,7 @@ def sftp_template_pipeline():
                 local_file = local_dir / filename
                 log.info(f"Downloading {remote_file} to {local_file}")
                 # TODO: Uncomment the line below to perform the actual download
-                # sftp.get(str(remote_file), str(local_file))
+                sftp.get(str(remote_file), str(local_file))
                 downloaded_files.append(str(local_file))
 
             sftp.close()
@@ -127,11 +127,11 @@ def sftp_template_pipeline():
             log.info(f"Reading {file_path}...")
             # TODO: Read each file into a DataFrame and append to `all_dfs`
             # Example:
-            # try:
-            #     df = pd.read_csv(file_path)
-            #     all_dfs.append(df)
-            # except pd.errors.EmptyDataError:
-            #     log.warning(f"File is empty: {file_path}")
+            try:
+                df = pd.read_csv(file_path)
+                all_dfs.append(df)
+            except pd.errors.EmptyDataError:
+                log.warning(f"File is empty: {file_path}")
             pass
 
         if not all_dfs:
@@ -160,13 +160,13 @@ def sftp_template_pipeline():
         log.info(f"Loading {len(df)} rows into Snowflake table: {SNOWFLAKE_TABLE}")
         
         # TODO: Implement the Snowflake loading logic.
-        # conn = get_snowflake_connection()
+        conn = get_snowflake_connection()
         try:
-            # from snowflake.connector.pandas_tools import write_pandas
-            # success, n_chunks, n_rows, _ = write_pandas(conn, df, SNOWFLAKE_TABLE)
-            # if not success:
-            #     raise Exception("Snowflake write_pandas failed.")
-            # log.info(f"Successfully loaded {n_rows} rows to {SNOWFLAKE_TABLE}.")
+            from snowflake.connector.pandas_tools import write_pandas
+            success, n_chunks, n_rows, _ = write_pandas(conn, df, SNOWFLAKE_TABLE)
+            if not success:
+                raise Exception("Snowflake write_pandas failed.")
+            log.info(f"Successfully loaded {n_rows} rows to {SNOWFLAKE_TABLE}.")
 
             # --- Log Processed Date on Success ---
             with open(PROCESSED_LOG_FILE, "a") as f:
