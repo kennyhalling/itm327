@@ -37,7 +37,7 @@ log = logging.getLogger(__name__)
 # IMPORTANT: These paths are relative to the Airflow project root.
 STAGING_AREA = Path("staging/mongo")
 PROCESSED_LOG_FILE = STAGING_AREA / "processed_dates.txt"
-SNOWFLAKE_TABLE = "YOUR_MONGO_TARGET_TABLE_HERE"  # TODO: Replace with your Snowflake table name
+SNOWFLAKE_TABLE = "STOCKS_HALLING_K"  # TODO: Replace with your Snowflake table name
 
 
 
@@ -90,10 +90,10 @@ def mongo_template_pipeline():
             log.info("Starting SSH tunnel to MongoDB...")
             tunnel = create_ssh_tunnel()
             mongo_client = get_mongo_client(local_port=tunnel.local_bind_port)
-            
+
             # TODO: Specify your database and collection name
-            db = mongo_client["your_db_name"]
-            collection = db["your_collection_name"]
+            db = mongo_client["stock-data-db"]
+            collection = db["price"]
             log.info(f"Connected to MongoDB collection: {collection.name}")
 
             # --- Define Query ---
@@ -108,7 +108,7 @@ def mongo_template_pipeline():
             
             # TODO: Define the projection to select specific fields from the document.
             # An empty projection `{}` will retrieve all fields.
-            projection = {"_id": 0} # Exclude the default MongoDB ID
+            projection = {"_id": 0, "symbol": 1, "datetime": 1, "open": 1, "high": 1, "low": 1, "close": 1, "volume": 1} # Exclude the default MongoDB ID
             
             # --- Fetch Data and Stage ---
             records = list(collection.find(query, projection))
@@ -168,12 +168,17 @@ def mongo_template_pipeline():
             return date_str
 
         log.info(f"Loading {len(df)} rows into Snowflake table: {SNOWFLAKE_TABLE}")
-        # conn = get_snowflake_connection() # TODO: Uncomment
+        conn = get_snowflake_connection() # TODO: Uncomment
         try:
             # TODO: Use conn.cursor() or write_pandas() to load the DataFrame.
             # A MERGE statement is recommended to prevent duplicates if the DAG is re-run
             # before the date is logged.
             log.info("Placeholder for Snowflake load logic.")
+            from snowflake.connector.pandas_tools import write_pandas
+            success, n_chunks, n_rows, _ = write_pandas(conn, df, SNOWFLAKE_TABLE, quote_identifiers=False)
+            if not success:
+                raise Exception("Snowflake write_pandas failed.")
+            log.info(f"Successfully loaded {n_rows} rows to {SNOWFLAKE_TABLE}.")
 
             # --- Log Processed Date on Success ---
             with open(PROCESSED_LOG_FILE, "a") as f:
@@ -184,7 +189,7 @@ def mongo_template_pipeline():
             log.error(f"Snowflake load failed: {e}")
             raise
         finally:
-            # if conn: conn.close() # TODO: Uncomment
+            if conn: conn.close() # TODO: Uncomment
             log.info("Snowflake connection placeholder closed.")
         
         return date_str

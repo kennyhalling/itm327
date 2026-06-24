@@ -163,7 +163,7 @@ def sftp_template_pipeline():
         conn = get_snowflake_connection()
         try:
             from snowflake.connector.pandas_tools import write_pandas
-            success, n_chunks, n_rows, _ = write_pandas(conn, df, SNOWFLAKE_TABLE)
+            success, n_chunks, n_rows, _ = write_pandas(conn, df, SNOWFLAKE_TABLE, quote_identifiers=False)
             if not success:
                 raise Exception("Snowflake write_pandas failed.")
             log.info(f"Successfully loaded {n_rows} rows to {SNOWFLAKE_TABLE}.")
